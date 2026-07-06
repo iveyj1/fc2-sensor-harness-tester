@@ -1,6 +1,6 @@
 ARDUINO_CLI ?= ./bin/arduino-cli
 CONFIG      ?= arduino-cli.yaml
-SKETCH      ?= VoltageWindowD2D3
+SKETCH      ?= SensorHarnessTester
 PORT        ?= /dev/ttyUSB0
 # This connected Nano uploaded successfully with the newer/official bootloader.
 # Use cpu=atmega328old for many Nano clones with the old bootloader.

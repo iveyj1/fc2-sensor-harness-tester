@@ -1,15 +1,24 @@
 #!/usr/bin/env bash
 
-tty="/dev/ttyUSB0"   # change this
-count=0
-while IFS= read -r line <"$tty"; do
+tty="/dev/ttyUSB0"
+
+stty -F "$tty" 115200 raw -echo
+
+exec 3<"$tty"
+
+# Opening the serial port may reset the Nano once; let it boot.
+sleep 2
+
+while IFS= read -r line <&3; do
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$line"
     if [[ "${line,,}" == *fail* ]]; then
         break
     fi
 done
-  
+
 for i in {1..10}; do
-    IFS= read -r line < "$tty"
+    IFS= read -r line <&3 || break
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$line"
-done   
+done
+
+exec 3<&-

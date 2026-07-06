@@ -2416,7 +2416,7 @@
 			(embedded_fonts no)
 		)
 	)
-	(text "A2"
+	(text "A5"
 		(exclude_from_sim no)
 		(at 40.64 118.11 0)
 		(effects
@@ -2476,7 +2476,7 @@
 		)
 		(uuid "37ffedd7-067e-41d4-a68b-9ea02c7a170c")
 	)
-	(text "A3"
+	(text "A6"
 		(exclude_from_sim no)
 		(at 40.64 71.12 0)
 		(effects
@@ -2538,7 +2538,7 @@
 	)
 	(text "DRIVER"
 		(exclude_from_sim no)
-		(at 112.014 86.36 0)
+		(at 110.236 168.656 0)
 		(effects
 			(font
 				(size 2 2)
@@ -2546,7 +2546,7 @@
 		)
 		(uuid "7f8f50bb-f002-4741-9459-1cca4fbcb591")
 	)
-	(text "A1"
+	(text "A4"
 		(exclude_from_sim no)
 		(at 41.91 160.02 0)
 		(effects
@@ -2576,7 +2576,7 @@
 		)
 		(uuid "b9bfb2ab-c663-4fe3-bb0c-371c388f67df")
 	)
-	(text "A4"
+	(text "A7"
 		(exclude_from_sim no)
 		(at 38.1 34.29 0)
 		(effects
@@ -2598,7 +2598,7 @@
 	)
 	(text "SENSOR"
 		(exclude_from_sim no)
-		(at 111.76 143.256 0)
+		(at 114.808 86.36 0)
 		(effects
 			(font
 				(size 2 2)
@@ -2616,7 +2616,7 @@
 		)
 		(uuid "e0759936-43e9-43c3-8891-0d2feb1f7b07")
 	)
-	(text "A0"
+	(text "A3"
 		(exclude_from_sim no)
 		(at 39.37 213.36 0)
 		(effects
