@@ -24,6 +24,7 @@ constexpr uint8_t PASS_LED_PIN = 3;
 constexpr float ADC_REFERENCE_VOLTS = 1.1;
 constexpr float ADC_MAX_COUNT = 1023.0;
 constexpr unsigned long LOOP_PERIOD_MS = 100;  // 10 readings/second
+constexpr uint8_t TRAILING_CLEAR_SPACES = 20;
 
 // Calibration factors multiply the resistor-divider-based voltage calculation.
 // D_0_10, D_12V, and S_12V factors were calculated from live readings with a
@@ -90,6 +91,41 @@ void setLights(bool pass) {
   digitalWrite(PASS_LED_PIN, pass ? HIGH : LOW);
 }
 
+void printSpaces(uint8_t count) {
+  while (count-- > 0) {
+    Serial.print(' ');
+  }
+}
+
+void printPaddedText(const char *text, uint8_t width) {
+  const uint8_t len = strlen(text);
+  Serial.print(text);
+  if (len < width) {
+    printSpaces(width - len);
+  }
+}
+
+void printPaddedUint(uint16_t value, uint8_t width) {
+  char buffer[8];
+  ultoa(value, buffer, 10);
+  const uint8_t len = strlen(buffer);
+  if (len < width) {
+    printSpaces(width - len);
+  }
+  Serial.print(buffer);
+}
+
+void printPaddedFloat(float value, uint8_t width, uint8_t precision) {
+  char buffer[16];
+  dtostrf(value, width, precision, buffer);
+  Serial.print(buffer);
+}
+
+void finishDisplayLine() {
+  printSpaces(TRAILING_CLEAR_SPACES);
+  Serial.println();
+}
+
 void startupLedTest() {
   for (uint8_t i = 0; i < 3; ++i) {
     digitalWrite(ERROR_LED_PIN, HIGH);
@@ -111,6 +147,7 @@ void setup() {
   setLights(false);
 
   Serial.begin(115200);
+  Serial.print(F("\x1B[2J\x1B[H"));  // Clear once after reset/startup.
 
   analogReference(INTERNAL);  // Nano/ATmega328P internal 1.1 V reference
   delay(10);
@@ -124,7 +161,15 @@ void setup() {
 void loop() {
   bool allPass = true;
 
-  Serial.println(F("--- FC2 sensor harness test ---"));
+  // ANSI cursor-home. This overwrites the previous fixed-width display without
+  // clearing the whole screen, reducing terminal flashing/flicker.
+  Serial.print(F("\x1B[H"));
+  Serial.print(F("FC2 sensor harness test"));
+  finishDisplayLine();
+  Serial.print(F("Signal    Ch  Counts   InputV  Standard       Tol  Result"));
+  finishDisplayLine();
+  Serial.print(F("--------  --  ------  -------  --------  --------  ------"));
+  finishDisplayLine();
 
   for (size_t i = 0; i < CHANNEL_COUNT; ++i) {
     const Channel &channel = channels[i];
@@ -136,23 +181,29 @@ void loop() {
       allPass = false;
     }
 
-    Serial.print(channel.name);
-    Serial.print(F(" A"));
-    Serial.print(channel.pin - A0);
-    Serial.print(F(" counts="));
-    Serial.print(counts);
-    Serial.print(F(" inputV="));
-    Serial.print(inputVolts, 3);
-    Serial.print(F(" standard="));
-    Serial.print(channel.standardVolts, 3);
-    Serial.print(F(" tol=+/-"));
-    Serial.print(channel.toleranceVolts, 3);
-    Serial.print(F(" "));
-    Serial.println(pass ? F("PASS") : F("FAIL"));
+    char pinName[4];
+    pinName[0] = 'A';
+    itoa(channel.pin - A0, &pinName[1], 10);
+
+    printPaddedText(channel.name, 8);
+    Serial.print(F("  "));
+    printPaddedText(pinName, 2);
+    Serial.print(F("  "));
+    printPaddedUint(counts, 6);
+    Serial.print(F("  "));
+    printPaddedFloat(inputVolts, 7, 3);
+    Serial.print(F("  "));
+    printPaddedFloat(channel.standardVolts, 8, 3);
+    Serial.print(F("  +/-"));
+    printPaddedFloat(channel.toleranceVolts, 5, 3);
+    Serial.print(F("  "));
+    Serial.print(pass ? F("PASS") : F("FAIL"));
+    finishDisplayLine();
   }
 
-  Serial.println(allPass ? F("unit PASS") : F("unit FAIL"));
-  Serial.println();
+  Serial.print(allPass ? F("unit PASS") : F("unit FAIL"));
+  finishDisplayLine();
+  finishDisplayLine();
 
   setLights(allPass);
   delay(LOOP_PERIOD_MS);

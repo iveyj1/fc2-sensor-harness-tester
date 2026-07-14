@@ -8,11 +8,15 @@ exec 3<"$tty"
 
 # Opening the serial port may reset the Nano once; let it boot.
 sleep 2
-
+count=0
 while IFS= read -r line <&3; do
-    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$line"
-    if [[ "${line,,}" == *fail* ]]; then
-        break
+    # printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$line"
+    printf '%s\n' "$line"
+    if [[ "${line,,}" == *unit\ fail* ]]; then
+        ((count++))
+    fi
+    if [[ "${line,,}" == *unit* ]]; then
+        printf "fail count %d" "$count"
     fi
 done
 
