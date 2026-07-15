@@ -4,12 +4,12 @@ import cadquery as cq
 # ----------------------------
 
 box_length = 100
-box_width = 100
+box_width = 150
 box_height = 40
-box_wall = 1.5
+box_wall = 3
 
-lid_thickness_center = 2
-lid_thickness_edge = 1
+lid_thickness_center = 4
+lid_thickness_edge = 2
 lid_clearance = 0.1
 lid_plug_depth = lid_thickness_center - lid_thickness_edge
 lid_post_clearance = 0.1
@@ -21,6 +21,8 @@ box_screw_post_hole_depth = 6
 box_screw_post_inset = 5
 box_screw_post_height = box_height - lid_plug_depth - lid_post_clearance
 lid_screw_hole_diameter = 2.4
+lid_screw_head_recess_diameter = 4.2
+lid_screw_head_recess_depth = 1
 
 post_base_fillet_radius = 1.5
 
@@ -38,11 +40,21 @@ usb_hole_width = 15
 usb_hole_height = 10
 
 conn_hole_width = 19.5
-conn_hole_height = 9
+conn_hole_height = 7.5
 
 conn_ledge_depth = 10
 conn_ledge_thickness = 3
-conn_ledge_extra_width = conn_ledge_thickness
+conn_ledge_wall_thickness = 7
+conn_ledge_extra_width = conn_ledge_wall_thickness
+conn_ledge_wall_hole_diameter = 1.9
+conn_ledge_wall_hole_depth = 5
+
+conn_strap_thickness = 5
+conn_strap_hole_diameter = 2.5
+conn_registration_bump_diameter = 1.5
+conn_registration_bump_height = 1.5
+conn_registration_bump_spacing = 6
+conn_registration_bump_chamfer = 0.5
 
 conn_positions = [
     (-20, 15),
@@ -198,30 +210,57 @@ def enclosure_screw_posts():
     )
 
 def usb_cutout():
+    cutout_overcut = 2
     return (
         cq.Workplane("XY")
         .box(
             usb_hole_width,
-            box_wall + 2,
+            box_wall + 2 * cutout_overcut,
             usb_hole_height,
         )
         .translate((
             box_width / 2 - box_width / 3,
-            box_length / 2,
+            box_length / 2 - box_wall / 2,
             nano_post_height + 1,
         ))
     )
 
+def registration_bumps(up=True):
+    bump = (
+        cq.Workplane("XY")
+        .circle(conn_registration_bump_diameter / 2)
+        .extrude(conn_registration_bump_height)
+    )
+
+    if up:
+        bump = bump.faces(">Z").edges().chamfer(conn_registration_bump_chamfer)
+    else:
+        bump = (
+            bump
+            .translate((0, 0, -conn_registration_bump_height))
+            .faces("<Z")
+            .edges()
+            .chamfer(conn_registration_bump_chamfer)
+        )
+
+    bumps = cq.Workplane("XY")
+    for y_offset in (-conn_registration_bump_spacing / 2, conn_registration_bump_spacing / 2):
+        bumps = bumps.union(bump.translate((0, y_offset, 0)))
+
+    return bumps
+
+
 def add_conn_cutout(body, offset_y, offset_z):
+    cutout_overcut = 2
     cutter = (
         cq.Workplane("XY")
         .box(
-            box_wall + 2,
+            box_wall + 2 * cutout_overcut,
             conn_hole_width,
             conn_hole_height,
         )
         .translate((
-            -box_width / 2,
+            -box_width / 2 + box_wall / 2,
             offset_y,
             offset_z,
         ))
@@ -247,25 +286,46 @@ def add_conn_cutout(body, offset_y, offset_z):
     )
 
     wall_gap = conn_hole_width
-    side_wall_y_offset = wall_gap / 2 + conn_ledge_thickness / 2
+    side_wall_y_offset = wall_gap / 2 + conn_ledge_wall_thickness / 2
     side_walls = cq.Workplane("XY")
+    wall_top_z = offset_z + conn_hole_height / 2
+    wall_bottom_z = box_wall
+    wall_height = wall_top_z - wall_bottom_z
+    wall_center_z = wall_bottom_z + wall_height / 2
 
     for y_offset in (-side_wall_y_offset, side_wall_y_offset):
         side_walls = side_walls.union(
             cq.Workplane("XY")
             .box(
                 conn_ledge_depth,
-                conn_ledge_thickness,
-                conn_hole_height,
+                conn_ledge_wall_thickness,
+                wall_height,
             )
             .translate((
                 ledge_x,
                 offset_y + y_offset,
-                offset_z,
+                wall_center_z,
             ))
         )
 
-    return body.cut(cutter).union(ledge).union(side_walls)
+    wall_holes = (
+        cq.Workplane("XY")
+        .pushPoints([
+            (ledge_x, offset_y - side_wall_y_offset),
+            (ledge_x, offset_y + side_wall_y_offset),
+        ])
+        .circle(conn_ledge_wall_hole_diameter / 2)
+        .extrude(conn_ledge_wall_hole_depth)
+        .translate((0, 0, wall_top_z - conn_ledge_wall_hole_depth))
+    )
+
+    ledge_bumps = registration_bumps(up=True).translate((
+        ledge_x,
+        offset_y,
+        offset_z - conn_hole_height / 2,
+    ))
+
+    return body.cut(cutter).union(ledge).union(ledge_bumps).union(side_walls).cut(wall_holes)
 
 def enclosure():
     body = enclosure_shell()
@@ -285,6 +345,54 @@ def enclosure():
         body = add_conn_cutout(body, offset_y, offset_z)
 
     return body
+
+# ----------------------------
+# Connector straps
+# ----------------------------
+
+def conn_wall_y_offset():
+    return conn_hole_width / 2 + conn_ledge_wall_thickness / 2
+
+
+def connector_strap():
+    strap_length = conn_hole_width + 2 * conn_ledge_wall_thickness
+    hole_y = conn_wall_y_offset()
+
+    strap = (
+        cq.Workplane("XY")
+        .box(
+            conn_ledge_depth,
+            strap_length,
+            conn_strap_thickness,
+            centered=(True, True, False),
+        )
+        .faces(">Z")
+        .workplane()
+        .pushPoints([(0, -hole_y), (0, hole_y)])
+        .hole(conn_strap_hole_diameter)
+    )
+
+    bumps = registration_bumps(up=False)
+
+    return strap.union(bumps)
+
+
+def connector_straps():
+    straps = cq.Workplane("XY")
+    strap_spacing = conn_hole_width + 2 * conn_ledge_wall_thickness + 10
+    strap_x = -box_width / 2 - conn_ledge_depth / 2 - 20
+    first_strap_y = -strap_spacing * (len(conn_positions) - 1) / 2
+
+    for index, _ in enumerate(conn_positions):
+        straps = straps.union(
+            connector_strap().translate((
+                strap_x,
+                first_strap_y + index * strap_spacing,
+                conn_registration_bump_height,
+            ))
+        )
+
+    return straps
 
 # ----------------------------
 # Lid
@@ -324,6 +432,10 @@ def enclosure_lid():
         .workplane()
         .pushPoints(screw_post_points())
         .hole(lid_screw_hole_diameter)
+        .faces(">Z")
+        .workplane()
+        .pushPoints(screw_post_points())
+        .hole(lid_screw_head_recess_diameter, lid_screw_head_recess_depth)
     )
 
     return lid
@@ -334,17 +446,21 @@ def enclosure_lid():
 
 box = enclosure()
 lid = enclosure_lid().translate((box_width + 20, 0, 0))
+straps = connector_straps()
 
 box.export("./box.step")
 lid.export("box-lid.step")
+straps.export("connector-straps.step")
 
 assy = cq.Assembly()
 assy.add(box, name="box")
 assy.add(lid, name="lid")
+assy.add(straps, name="connector_straps")
 
 try:
     show_object(box, name="box")
     show_object(lid, name="lid")
+    show_object(straps, name="connector_straps")
 except:
     pass
 

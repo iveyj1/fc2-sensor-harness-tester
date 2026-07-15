@@ -1,0 +1,2 @@
+source $HOME/cadquery/.venv_cadquery/bin/activate
+python3 tester.py
