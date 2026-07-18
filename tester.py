@@ -39,6 +39,9 @@ nano_post_fillet_radius = 1.5
 usb_hole_width = 15
 usb_hole_height = 10
 
+side_hole_diameter = 11.5
+
+
 conn_hole_width = 19.5
 conn_hole_height = 7.5
 
@@ -51,8 +54,9 @@ conn_ledge_wall_hole_depth = 5
 
 conn_strap_thickness = 5
 conn_strap_hole_diameter = 2.5
-conn_registration_bump_diameter = 1.5
-conn_registration_bump_height = 1.5
+conn_registration_bump_diameter = 2.4
+
+conn_registration_bump_height = 2
 conn_registration_bump_spacing = 6
 conn_registration_bump_chamfer = 0.5
 
@@ -225,23 +229,59 @@ def usb_cutout():
         ))
     )
 
-def registration_bumps(up=True):
-    bump = (
+
+def side_hole_cutout():
+    cutout_overcut = 2
+    x = -box_width / 2 + box_width / 3
+
+    return (
         cq.Workplane("XY")
-        .circle(conn_registration_bump_diameter / 2)
-        .extrude(conn_registration_bump_height)
+        .circle(side_hole_diameter / 2)
+        .extrude(box_wall + 2 * cutout_overcut)
+        .rotate((0, 0, 0), (1, 0, 0), -90)
+        .translate((
+            x,
+            -box_length / 2 - cutout_overcut,
+            box_height / 2,
+        ))
     )
 
-    if up:
-        bump = bump.faces(">Z").edges().chamfer(conn_registration_bump_chamfer)
-    else:
-        bump = (
-            bump
-            .translate((0, 0, -conn_registration_bump_height))
-            .faces("<Z")
-            .edges()
-            .chamfer(conn_registration_bump_chamfer)
+def registration_bumps(up=True):
+    pin_radius = conn_registration_bump_diameter / 2
+    base_radius = pin_radius + conn_registration_bump_chamfer
+    tip_radius = max(pin_radius - conn_registration_bump_chamfer, 0.1)
+    chamfer = conn_registration_bump_chamfer
+    straight_height = conn_registration_bump_height - 2 * chamfer
+
+    base_chamfer = cq.Workplane("XY").newObject([
+        cq.Solid.makeCone(
+            base_radius,
+            pin_radius,
+            chamfer,
+            pnt=(0, 0, 0),
+            dir=(0, 0, 1),
         )
+    ])
+    pin_body = (
+        cq.Workplane("XY")
+        .circle(pin_radius)
+        .extrude(straight_height)
+        .translate((0, 0, chamfer))
+    )
+    tip_chamfer = cq.Workplane("XY").newObject([
+        cq.Solid.makeCone(
+            pin_radius,
+            tip_radius,
+            chamfer,
+            pnt=(0, 0, chamfer + straight_height),
+            dir=(0, 0, 1),
+        )
+    ])
+
+    bump = base_chamfer.union(pin_body).union(tip_chamfer)
+
+    if not up:
+        bump = bump.rotate((0, 0, 0), (1, 0, 0), 180)
 
     bumps = cq.Workplane("XY")
     for y_offset in (-conn_registration_bump_spacing / 2, conn_registration_bump_spacing / 2):
@@ -340,6 +380,7 @@ def enclosure():
     )
 
     body = body.cut(usb_cutout())
+    body = body.cut(side_hole_cutout())
 
     for offset_y, offset_z in conn_positions:
         body = add_conn_cutout(body, offset_y, offset_z)
