@@ -56,7 +56,7 @@ conn_strap_thickness = 5
 conn_strap_hole_diameter = 2.5
 conn_registration_bump_diameter = 2.4
 
-conn_registration_bump_height = 2
+conn_registration_bump_height = 1.5
 conn_registration_bump_spacing = 6
 conn_registration_bump_chamfer = 0.5
 
