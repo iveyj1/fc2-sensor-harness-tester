@@ -81,34 +81,75 @@ def screw_post_points():
         ( x,  y),
     ]
 
-def base_flare(diameter, fillet_radius, base_z=0):
+def chamfered_post(
+    diameter,
+    height,
+    base_chamfer=0,
+    top_chamfer=0,
+    base_z=0,
+    hole_diameter=None,
+    hole_depth=None,
+):
     """
-    Printable root chamfer/gusset.
-    This is a shallow conical loft, not a true circular fillet.
-    It starts at base_z so it stays visible above the enclosure floor.
+    Vertical cylindrical post from base_z to height.
+    Positive base_chamfer flares outward at the base; positive top_chamfer
+    tapers inward at the working/top end. Optional hole is drilled from top.
     """
-    return (
-        cq.Workplane("XY")
-        .circle(diameter / 2 + fillet_radius)
-        .workplane(offset=fillet_radius)
-        .circle(diameter / 2)
-        .loft(combine=True)
-        .translate((0, 0, base_z))
-    )
+    radius = diameter / 2
+    solids = []
+    z = base_z
 
-def cyl_post(diameter, height, hole_diameter, hole_depth, fillet_radius=1.5, base_z=box_wall):
-    post = (
-        cq.Workplane("XY")
-        .circle(diameter / 2)
-        .extrude(height - base_z)
-        .translate((0, 0, base_z))
-        .union(base_flare(diameter, fillet_radius, base_z))
-        .faces(">Z")
-        .workplane()
-        .hole(hole_diameter, hole_depth)
-    )
+    if base_chamfer > 0:
+        solids.append(cq.Solid.makeCone(
+            radius + base_chamfer,
+            radius,
+            base_chamfer,
+            pnt=(0, 0, z),
+            dir=(0, 0, 1),
+        ))
+        z += base_chamfer
+
+    straight_height = height - z - top_chamfer
+    if straight_height > 0:
+        solids.append(cq.Solid.makeCylinder(
+            radius,
+            straight_height,
+            pnt=(0, 0, z),
+            dir=(0, 0, 1),
+        ))
+        z += straight_height
+
+    if top_chamfer > 0:
+        tip_radius = max(radius - top_chamfer, 0.1)
+        solids.append(cq.Solid.makeCone(
+            radius,
+            tip_radius,
+            top_chamfer,
+            pnt=(0, 0, z),
+            dir=(0, 0, 1),
+        ))
+
+    post = cq.Workplane("XY").newObject(solids).combine()
+
+    if hole_diameter is not None and hole_depth is not None:
+        post = (
+            post.faces(">Z")
+            .workplane()
+            .hole(hole_diameter, hole_depth)
+        )
 
     return post
+
+
+def cyl_post(diameter, height, hole_diameter, hole_depth, fillet_radius=1.5, base_z=box_wall):
+    return chamfered_post(
+        diameter,
+        height,
+        base_chamfer=fillet_radius,
+        base_z=base_z,
+        hole_diameter=hole_diameter,
+        hole_depth=hole_depth,
+    )
 
 def post_array(points, diameter, height, hole_diameter, hole_depth, fillet_radius):
     posts = cq.Workplane("XY")
@@ -130,8 +171,8 @@ def post_array(points, diameter, height, hole_diameter, hole_depth, fillet_radiu
 # Nano support posts
 # ----------------------------
 
-def nano_post():
-    post = cyl_post(
+def nano_post_body():
+    return cyl_post(
         nano_post_diameter,
         nano_post_height,
         nano_post_hole_diameter,
@@ -139,7 +180,9 @@ def nano_post():
         nano_post_fillet_radius,
     )
 
-    pocket = (
+
+def nano_board_corner_cutout():
+    return (
         cq.Workplane("XY")
         .box(
             4,
@@ -154,7 +197,9 @@ def nano_post():
         ))
     )
 
-    return post.cut(pocket)
+
+def nano_post():
+    return nano_post_body().cut(nano_board_corner_cutout())
 
 
 def nano_supports():
@@ -247,38 +292,12 @@ def side_hole_cutout():
     )
 
 def registration_bumps(up=True):
-    pin_radius = conn_registration_bump_diameter / 2
-    base_radius = pin_radius + conn_registration_bump_chamfer
-    tip_radius = max(pin_radius - conn_registration_bump_chamfer, 0.1)
-    chamfer = conn_registration_bump_chamfer
-    straight_height = conn_registration_bump_height - 2 * chamfer
-
-    base_chamfer = cq.Workplane("XY").newObject([
-        cq.Solid.makeCone(
-            base_radius,
-            pin_radius,
-            chamfer,
-            pnt=(0, 0, 0),
-            dir=(0, 0, 1),
-        )
-    ])
-    pin_body = (
-        cq.Workplane("XY")
-        .circle(pin_radius)
-        .extrude(straight_height)
-        .translate((0, 0, chamfer))
+    bump = chamfered_post(
+        conn_registration_bump_diameter,
+        conn_registration_bump_height,
+        base_chamfer=conn_registration_bump_chamfer,
+        top_chamfer=conn_registration_bump_chamfer,
     )
-    tip_chamfer = cq.Workplane("XY").newObject([
-        cq.Solid.makeCone(
-            pin_radius,
-            tip_radius,
-            chamfer,
-            pnt=(0, 0, chamfer + straight_height),
-            dir=(0, 0, 1),
-        )
-    ])
-
-    bump = base_chamfer.union(pin_body).union(tip_chamfer)
 
     if not up:
         bump = bump.rotate((0, 0, 0), (1, 0, 0), 180)
