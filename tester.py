@@ -43,7 +43,8 @@ side_hole_diameter = 11.5
 
 
 conn_hole_width = 19.5
-conn_hole_height = 7.5
+conn_hole_height = 8
+conn_height = 7.5
 
 conn_ledge_depth = 10
 conn_ledge_thickness = 3
@@ -347,7 +348,7 @@ def add_conn_cutout(body, offset_y, offset_z):
     wall_gap = conn_hole_width
     side_wall_y_offset = wall_gap / 2 + conn_ledge_wall_thickness / 2
     side_walls = cq.Workplane("XY")
-    wall_top_z = offset_z + conn_hole_height / 2
+    wall_top_z = offset_z + conn_height / 2
     wall_bottom_z = box_wall
     wall_height = wall_top_z - wall_bottom_z
     wall_center_z = wall_bottom_z + wall_height / 2
